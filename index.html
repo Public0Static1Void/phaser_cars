@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Cars game</title>
+    </head>
+    
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js">
+        
+        let config = {
+            width:800,
+            height:800,
+            scene:{
+                preload: preload,
+                create: start,
+                update: update
+            }
+        }
+
+        let game = new Phaser.Game(config)
+    </script>
+</html>
