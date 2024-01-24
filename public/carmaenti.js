@@ -3,6 +3,8 @@ let id = 0;
 
 let player1;
 let player2;
+let map;
+let bullet;
 
 const socket = new WebSocket("ws://10.40.2.179:8080");
 
@@ -23,6 +25,13 @@ socket.addEventListener("message", function(event){
 		}
 		else{
 			let dat = JSON.parse(data);
+
+			if (dat.bx != undefined){
+				bullet.x = dat.bx;
+				bullet.y = dat.by;
+				bullet.rotation = dat.br;
+			}
+
 			console.log("Code: ", JSON.stringify(dat));
 			switch(dat.id){
 				case 1:
@@ -67,17 +76,25 @@ document.addEventListener("DOMContentLoaded", function(){
 	const screen = new Phaser.Game(config);
 	
 	let keys;
+	let bullet_pressed = false;
+	let bullet_objective = 0;
 	
 	function preload (){
 	this.load.image('car1', 'assets/PNG/Cars/car_blue_small_1.png');
 	this.load.image('car2', 'assets/PNG/Cars/car_green_small_1.png');
+	this.load.image('map', 'assets/PNG/map.png');
+	this.load.image('bullet', 'assets/PNG/bala.png');
 	}
 	
 	
 	function create (){
+	map = this.add.image(400, 300, 'map');
 	player1 = this.add.image(400, 300, 'car1');
 	player2 = this.add.image(400, 400, 'car2');
 	
+	bullet = this.add.image(-50, 0, 'bullet');
+	bullet.setScale(.1);
+
 	keys = this.input.keyboard.createCursorKeys();
 	}
 	
@@ -100,6 +117,13 @@ document.addEventListener("DOMContentLoaded", function(){
 					player1_angle += CAR_ROTATION;
 				 }
 
+				 if (keys.space.isDown){ // Bala
+					bullet.x = player1.x;
+					bullet.y = player1.y;
+					bullet_objective = 2;
+					bullet_pressed = true;
+				 }
+
 				 player1.rotation = player1_angle * Math.PI / 180;
 				break;
 			case 2:
@@ -116,6 +140,13 @@ document.addEventListener("DOMContentLoaded", function(){
 				 }
 				 else if (keys.right.isDown){
 					player2_angle += CAR_ROTATION;
+				 }
+
+				 if (keys.space.isDown){ // Bala
+					bullet.x = player2.x;
+					bullet.y = player2.y;
+					bullet_objective = 1;
+					bullet_pressed = true;
 				 }
 
 				 player2.rotation = player2_angle * Math.PI / 180;
@@ -142,6 +173,32 @@ document.addEventListener("DOMContentLoaded", function(){
 		case 2:
 			socket.send(JSON.stringify(player2_data));
 			break;
+	 }
+
+	 if (!bullet_pressed){ // Send bullet
+		let angle = Math.atan2(player2.y - player1.y, player2.x - player1.x);
+		console.log("Code: ", bullet_objective);
+		switch (bullet_objective){
+			case 1:
+				angle = Math.atan2(player2.y - player1.y, player2.x - player1.x);
+				break;
+			case 2:
+				angle = Math.atan2(player1.y - player2.y, player1.x - player2.x);
+				break;
+		}
+
+		bullet.y -= CAR_SPEED*Math.cos(angle * Math.PI/180);
+		bullet.x += CAR_SPEED*Math.sin(angle * Math.PI/180);
+
+		bullet.rotation = angle * Math.PI / 180;
+
+		var bullet_data = {
+			bx: bullet.x,
+			by: bullet.y,
+			br: bullet.rotation
+		}
+
+		socket.send(JSON.stringify(bullet_data));
 	 }
 	}
 });
