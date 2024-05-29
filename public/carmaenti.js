@@ -6,199 +6,243 @@ let player2;
 let map;
 let bullet;
 
-const socket = new WebSocket("ws://10.40.2.179:8080");
+let bull_angle = 0;
+let bullet_objective = 0;
+
+let game_over = false;
+
+const socket = new WebSocket("ws://192.168.1.154:8081");
 
 socket.addEventListener("open", function(event){
-	socket.send("");
+    socket.send("");
 });
 
 socket.addEventListener("message", function(event){
-	try{
-		var data = event.data;
-		if (id == 0)
-			data = JSON.parse(event.data);
+    try{
+        // Ensure data is consistently parsed
+        var data = JSON.parse(event.data);
 
-		if (data.player_num != undefined && id == 0){
-			player_num = data.player_num;
-			console.log("Jugador: ", player_num);
-			id = player_num;
-		}
-		else{
-			let dat = JSON.parse(data);
-
-			if (dat.bx != undefined){
-				bullet.x = dat.bx;
-				bullet.y = dat.by;
-				bullet.rotation = dat.br;
-			}
-
-			console.log("Code: ", JSON.stringify(dat));
-			switch(dat.id){
-				case 1:
-					player1.x = dat.x;
-					player1.y = dat.y;
-					player1.rotation = dat.r;
-					break;
-				case 2:
-					player2.x = dat.x;
-					player2.y = dat.y;
-					player2.rotation = dat.r;
-					break;
-			}
-		}
-	}
-	catch (error){
-		console.error("Error parseando JSON: ", error);
-	}
+        // Handle the initial assignment of player_num and id
+        if (data.player_num !== undefined && id === 0) {
+            player_num = data.player_num;
+            console.log("Jugador: ", player_num);
+            id = player_num;
+        } else {
+            // Handle incoming player and bullet data
+            if (data.player_num !== undefined) {
+                console.log("Jugador: " + data.player_num);
+            } else {
+                // Update bullet position and rotation if provided
+                if (data.bx !== undefined) {
+                    bullet.x = data.bx;
+                    bullet.y = data.by;
+                    bullet.rotation = data.br;
+                    bullet_objective = data.bo;
+                }
+                
+                // Update player positions and rotations
+                switch (data.id) {
+                    case 1:
+                        player1.x = data.x;
+                        player1.y = data.y;
+                        player1.rotation = data.r;
+                        break;
+                    case 2:
+                        player2.x = data.x;
+                        player2.y = data.y;
+                        player2.rotation = data.r;
+                        break;
+                }
+                
+                // Handle game over status if provided
+                if (data.game_over !== undefined) {
+                    game_over = data.game_over;
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error parseando JSON: ", error);
+    }
 });
 
+
 socket.addEventListener("error", function(event){
-	console.error("Websocket error:", event);
+    console.error("Websocket error:", event);
 });
 
 let player1_angle = 0;
 let player2_angle = 0;
 
 document.addEventListener("DOMContentLoaded", function(){
-	const config = {
-		type: Phaser.AUTO,
-		width: 800, 
-		height: 600,
-		scene: {
-			preload: preload,
-			create: create,
-			update: update, 
-		   }
-	   };
-	const CAR_SPEED = 5;
-	const CAR_ROTATION = 5;
-	
-	const screen = new Phaser.Game(config);
-	
-	let keys;
-	let bullet_pressed = false;
-	let bullet_objective = 0;
-	
-	function preload (){
-	this.load.image('car1', 'assets/PNG/Cars/car_blue_small_1.png');
-	this.load.image('car2', 'assets/PNG/Cars/car_green_small_1.png');
-	this.load.image('map', 'assets/PNG/map.png');
-	this.load.image('bullet', 'assets/PNG/bala.png');
-	}
-	
-	
-	function create (){
-	map = this.add.image(400, 300, 'map');
-	player1 = this.add.image(400, 300, 'car1');
-	player2 = this.add.image(400, 400, 'car2');
-	
-	bullet = this.add.image(-50, 0, 'bullet');
-	bullet.setScale(.1);
+    const config = {
+        type: Phaser.AUTO,
+        width: 800, 
+        height: 600,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                debug: true
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update, 
+        }
+    };
 
-	keys = this.input.keyboard.createCursorKeys();
-	}
-	
-	function update (){
+    const CAR_SPEED = 5;
+    const CAR_ROTATION = 5;
 
+    const screen = new Phaser.Game(config);
+
+    let keys;
+    let bullet_pressed = false;
+
+    function preload (){
+        this.load.image('car1', 'assets/PNG/Cars/car_blue_small_1.png');
+        this.load.image('car2', 'assets/PNG/Cars/car_green_small_1.png');
+        this.load.image('map', 'assets/PNG/map.png');
+        this.load.image('bullet', 'assets/PNG/bala.png');
+    }
+
+    function create (){
+        map = this.add.image(400, 300, 'map');
+        player1 = this.physics.add.image(400, 300, 'car1');
+        player2 = this.physics.add.image(400, 400, 'car2');
+    
+        bullet = this.physics.add.image(-100, 0, 'bullet');
+        bullet.setScale(.1);
+
+        keys = this.input.keyboard.createCursorKeys();
+
+        // Enable collision detection
 		switch(id){
 			case 1:
-				if(keys.up.isDown){
-					player1.y -= CAR_SPEED*Math.cos(player1_angle*Math.PI/180);
-					player1.x += CAR_SPEED*Math.sin(player1_angle*Math.PI/180);
-				 }
-				 if(keys.down.isDown){
-					player1.y += CAR_SPEED*Math.cos(player1_angle*Math.PI/180);
-					player1.x -= CAR_SPEED*Math.sin(player1_angle*Math.PI/180);
-				 }
-				 if(keys.left.isDown){
-					player1_angle -= CAR_ROTATION;
-				 }
-				 else if (keys.right.isDown){
-					player1_angle += CAR_ROTATION;
-				 }
-
-				 if (keys.space.isDown){ // Bala
-					bullet.x = player1.x;
-					bullet.y = player1.y;
-					bullet_objective = 2;
-					bullet_pressed = true;
-				 }
-
-				 player1.rotation = player1_angle * Math.PI / 180;
+				this.physics.add.collider(bullet, player2, hitPlayer, null, this);
 				break;
 			case 2:
-				if(keys.up.isDown){
-					player2.y -= CAR_SPEED*Math.cos(player2_angle*Math.PI/180);
-					player2.x += CAR_SPEED*Math.sin(player2_angle*Math.PI/180);
-				 }
-				 if(keys.down.isDown){
-					player2.y += CAR_SPEED*Math.cos(player2_angle*Math.PI/180);
-					player2.x -= CAR_SPEED*Math.sin(player2_angle*Math.PI/180);
-				 }
-				 if(keys.left.isDown){
-					player2_angle -= CAR_ROTATION;
-				 }
-				 else if (keys.right.isDown){
-					player2_angle += CAR_ROTATION;
-				 }
-
-				 if (keys.space.isDown){ // Bala
-					bullet.x = player2.x;
-					bullet.y = player2.y;
-					bullet_objective = 1;
-					bullet_pressed = true;
-				 }
-
-				 player2.rotation = player2_angle * Math.PI / 180;
+				this.physics.add.collider(bullet, player1, hitPlayer, null, this);
 				break;
 		}
-		 
-	 var player1_data = {
-		x: player1.x,
-		y: player1.y,
-		r: player1.rotation,
-		id: id
-	 };
-	 var player2_data = {
-		x: player2.x,
-		y: player2.y,
-		r: player2.rotation,
-		id: id
-	 };
-	 
-	 switch(id){
-		case 1:
-			socket.send(JSON.stringify(player1_data));
-			break;
-		case 2:
-			socket.send(JSON.stringify(player2_data));
-			break;
-	 }
+    }
 
-	 if (!bullet_pressed){ // Send bullet
-		let angle = Math.atan2(player2.y - player1.y, player2.x - player1.x);
-		console.log("Code: ", bullet_objective);
-		switch (bullet_objective){
+    function hitPlayer(bullet, player) {
+        // Display message
+        switch(id){
 			case 1:
-				angle = player2_angle;
+				alert("Player 2 wins!");
 				break;
 			case 2:
-				angle = player1_angle;
+				alert("Player 1 wins!");
 				break;
 		}
+        // Reset bullet
+        bullet.x = -50;
+        bullet.y = 0;
+        bullet_pressed = false;
+    }
+    
+    var space_hold = false;
+    let const_ang = 0;
 
-		bullet.y -= CAR_SPEED*Math.cos(angle * Math.PI/180);
-		bullet.x += CAR_SPEED*Math.sin(angle * Math.PI/180);
+    function update (){
+        switch(id){
+            case 1:
+                if(keys.up.isDown){
+                    player1.y -= CAR_SPEED * Math.cos(player1_angle * Math.PI / 180);
+                    player1.x += CAR_SPEED * Math.sin(player1_angle * Math.PI / 180);
+                }
+                if(keys.down.isDown){
+                    player1.y += CAR_SPEED * Math.cos(player1_angle * Math.PI / 180);
+                    player1.x -= CAR_SPEED * Math.sin(player1_angle * Math.PI / 180);
+                }
+                if(keys.left.isDown){
+                    player1_angle -= CAR_ROTATION;
+                }
+                else if (keys.right.isDown){
+                    player1_angle += CAR_ROTATION;
+                }
 
-		bullet.rotation = angle * (Math.PI / 180);
+                if (keys.space.isDown){ // Bala
+                    bullet.x = player1.x;
+                    bullet.y = player1.y;
+                    bullet.rotation = player1_angle * Math.PI / 180;
+                    bullet_objective = 2;
+                    bullet_pressed = true;
+                    space_hold = true;
+                }
 
-		var bullet_data = {
-			bx: bullet.x,
-			by: bullet.y,
-			br: bullet.rotation
-		}
+                player1.rotation = player1_angle * Math.PI / 180;
+                break;
+            case 2:
+                if(keys.up.isDown){
+                    player2.y -= CAR_SPEED * Math.cos(player2_angle * Math.PI / 180);
+                    player2.x += CAR_SPEED * Math.sin(player2_angle * Math.PI / 180);
+                }
+                if(keys.down.isDown){
+                    player2.y += CAR_SPEED * Math.cos(player2_angle * Math.PI / 180);
+                    player2.x -= CAR_SPEED * Math.sin(player2_angle * Math.PI / 180);
+                }
+                if(keys.left.isDown){
+                    player2_angle -= CAR_ROTATION;
+                }
+                else if (keys.right.isDown){
+                    player2_angle += CAR_ROTATION;
+                }
 
-		socket.send(JSON.stringify(bullet_data));
-	 }
-	}
+                if (keys.space.isDown){ // Bala
+                    bullet.x = player2.x;
+                    bullet.y = player2.y;
+                    bullet.rotation = player2_angle * Math.PI / 180;
+                    bullet_objective = 1;
+                    bullet_pressed = true;
+                    space_hold = true;
+                }
+
+                player2.rotation = player2_angle * Math.PI / 180;
+                break;
+        }
+         
+        var player1_data = {
+            x: player1.x,
+            y: player1.y,
+            r: player1.rotation,
+            id: id
+        };
+        var player2_data = {
+            x: player2.x,
+            y: player2.y,
+            r: player2.rotation,
+            id: id
+        };
+     
+        switch(id){
+            case 1:
+                socket.send(JSON.stringify(player1_data));
+                break;
+            case 2:
+                socket.send(JSON.stringify(player2_data));
+                break;
+        }
+
+        if (bullet_pressed){ // Send bullet
+            if (space_hold){
+                const_ang = (bullet_objective === 1) ? player2_angle : player1_angle;
+                space_hold = false;
+            }
+
+            bullet.y -= 4 * CAR_SPEED * Math.cos(const_ang * Math.PI / 180);
+            bullet.x += 4 * CAR_SPEED * Math.sin(const_ang * Math.PI / 180);
+
+            var bullet_data = {
+                bx: bullet.x,
+                by: bullet.y,
+                br: bullet.rotation,
+                bo: bullet_objective
+            };
+
+            socket.send(JSON.stringify(bullet_data));
+        }
+    }
 });
