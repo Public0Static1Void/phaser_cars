@@ -180,17 +180,17 @@ document.addEventListener("DOMContentLoaded", function(){
 		console.log("Code: ", bullet_objective);
 		switch (bullet_objective){
 			case 1:
-				angle = Math.atan2(player2.y - player1.y, player2.x - player1.x);
+				angle = player2_angle;
 				break;
 			case 2:
-				angle = Math.atan2(player1.y - player2.y, player1.x - player2.x);
+				angle = player1_angle;
 				break;
 		}
 
 		bullet.y -= CAR_SPEED*Math.cos(angle * Math.PI/180);
 		bullet.x += CAR_SPEED*Math.sin(angle * Math.PI/180);
 
-		bullet.rotation = angle * Math.PI / 180;
+		bullet.rotation = angle * (Math.PI / 180);
 
 		var bullet_data = {
 			bx: bullet.x,
